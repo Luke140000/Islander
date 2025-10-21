@@ -33,40 +33,40 @@
     <div id="instructions">Find the hidden coin to reveal the next one!</div>
 
     <a-scene background="color: skyblue" vr-mode-ui="enabled: true">
-        <!-- VR Camera Rig for movement -->
-        <a-entity id="cameraRig" 
-                  position="0 0 3"
-                  movement-controls="fly: false; constrainToNavMesh: false; speed: 0.1">
-            
-            <!-- Camera -->
-            <a-camera position="0 1.6 0" 
-                     look-controls="pointerLockEnabled: true"
-                     wasd-controls="acceleration: 20; fly: false">
-                
-                <!-- Desktop cursor -->
-                <a-cursor position="0 0 -1" 
-                         geometry="primitive: ring; radiusInner: 0.02; radiusOuter: 0.03" 
-                         material="color: white; shader: flat" 
-                         animation__click="property: scale; startEvents: click; from: 0.1 0.1 0.1; to: 1 1 1; dur: 150"
-                         raycaster="objects: .coin"
-                         visible="true"></a-cursor>
-            </a-camera>
-            
-            <!-- Left VR Controller with thumbstick movement -->
-            <a-entity id="leftController"
-                     oculus-touch-controls="hand: left"
-                     thumbstick-logging
-                     raycaster="objects: .coin; lineColor: red; lineOpacity: 0.5">
-            </a-entity>
-            
-            <!-- Right VR Controller with turning and interaction -->
-            <a-entity id="rightController"
-                     oculus-touch-controls="hand: right"
-                     thumbstick-logging
-                     raycaster="objects: .coin; lineColor: blue; lineOpacity: 0.5"
-                     laser-controls>
-            </a-entity>
-        </a-entity>
+      <!-- VR + Desktop Movement Camera Rig -->
+<a-entity id="cameraRig"
+          position="0 0 3"
+          movement-controls="fly: false; constrainToNavMesh: false; speed: 0.1"
+          wasd-controls="acceleration: 20; fly: false">
+    
+    <!-- Camera -->
+    <a-camera position="0 1.6 0"
+              look-controls="pointerLockEnabled: true">
+        
+        <!-- Cursor for desktop interaction -->
+        <a-cursor position="0 0 -1"
+                  geometry="primitive: ring; radiusInner: 0.02; radiusOuter: 0.03"
+                  material="color: white; shader: flat"
+                  animation__click="property: scale; startEvents: click; from: 0.1 0.1 0.1; to: 1 1 1; dur: 150"
+                  raycaster="objects: .coin"
+                  visible="true"></a-cursor>
+    </a-camera>
+
+    <!-- Left VR Controller (movement) -->
+    <a-entity id="leftController"
+              oculus-touch-controls="hand: left"
+              thumbstick-logging
+              raycaster="objects: .coin; lineColor: red; lineOpacity: 0.5">
+    </a-entity>
+
+    <!-- Right VR Controller (turning + raycaster) -->
+    <a-entity id="rightController"
+              oculus-touch-controls="hand: right"
+              thumbstick-logging
+              raycaster="objects: .coin; lineColor: blue; lineOpacity: 0.5"
+              laser-controls>
+    </a-entity>
+</a-entity>
         
         <!-- Lighting -->
         <a-light type="ambient" color="#404040"></a-light>
