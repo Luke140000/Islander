@@ -32,41 +32,15 @@
     <div id="score">Score: 0 / 15</div>
     <div id="instructions">Find the hidden coin to reveal the next one!</div>
 
-    <a-scene background="color: skyblue" vr-mode-ui="enabled: true">
-      <!-- VR + Desktop Movement Camera Rig -->
-<a-entity id="cameraRig"
-          position="0 0 3"
-          movement-controls="fly: false; constrainToNavMesh: false; speed: 0.1"
-          wasd-controls="acceleration: 20; fly: false">
-    
-    <!-- Camera -->
-    <a-camera position="0 1.6 0"
-              look-controls="pointerLockEnabled: true">
-        
-        <!-- Cursor for desktop interaction -->
-        <a-cursor position="0 0 -1"
-                  geometry="primitive: ring; radiusInner: 0.02; radiusOuter: 0.03"
-                  material="color: white; shader: flat"
-                  animation__click="property: scale; startEvents: click; from: 0.1 0.1 0.1; to: 1 1 1; dur: 150"
-                  raycaster="objects: .coin"
-                  visible="true"></a-cursor>
-    </a-camera>
-
-    <!-- Left VR Controller (movement) -->
-    <a-entity id="leftController"
-              oculus-touch-controls="hand: left"
-              thumbstick-logging
-              raycaster="objects: .coin; lineColor: red; lineOpacity: 0.5">
-    </a-entity>
-
-    <!-- Right VR Controller (turning + raycaster) -->
-    <a-entity id="rightController"
-              oculus-touch-controls="hand: right"
-              thumbstick-logging
-              raycaster="objects: .coin; lineColor: blue; lineOpacity: 0.5"
-              laser-controls>
-    </a-entity>
-</a-entity>
+    <a-scene background="color: skyblue">
+        <!-- Camera with slower movement and cursor -->
+        <a-camera position="0 2 5" look-controls wasd-controls="acceleration: 20">
+            <a-cursor position="0 0 -1" geometry="primitive: ring; radiusInner: 0.02; radiusOuter: 0.03" 
+                     material="color: white; shader: flat" 
+                     animation__click="property: scale; startEvents: click; from: 0.1 0.1 0.1; to: 1 1 1; dur: 150"
+                     animation__fusing="property: scale; startEvents: fusing; from: 1 1 1; to: 0.1 0.1 0.1; dur: 1500"
+                     raycaster="objects: .coin"></a-cursor>
+        </a-camera>
         
         <!-- Lighting -->
         <a-light type="ambient" color="#404040"></a-light>
@@ -155,57 +129,6 @@
     </a-scene>
 
     <script>
-        // Register custom component for thumbstick movement
-        AFRAME.registerComponent('thumbstick-logging', {
-            init: function () {
-                this.el.addEventListener('thumbstickmoved', this.logThumbstick);
-            },
-            logThumbstick: function (evt) {
-                const cameraRig = document.querySelector('#cameraRig');
-                const camera = document.querySelector('a-camera');
-                
-                if (evt.detail.x !== undefined && evt.detail.y !== undefined) {
-                    // Get current positions
-                    const rigPosition = cameraRig.getAttribute('position');
-                    const cameraRotation = camera.getAttribute('rotation');
-                    
-                    // Movement speed
-                    const speed = 0.1;
-                    
-                    // Calculate movement based on camera direction
-                    const yRotation = THREE.MathUtils.degToRad(cameraRotation.y);
-                    
-                    // Left controller - movement
-                    if (this.el.id === 'leftController') {
-                        const deltaX = evt.detail.x * speed;
-                        const deltaZ = -evt.detail.y * speed;
-                        
-                        // Apply rotation to movement
-                        const newX = rigPosition.x + (deltaX * Math.cos(yRotation) - deltaZ * Math.sin(yRotation));
-                        const newZ = rigPosition.z + (deltaX * Math.sin(yRotation) + deltaZ * Math.cos(yRotation));
-                        
-                        cameraRig.setAttribute('position', {
-                            x: newX,
-                            y: rigPosition.y,
-                            z: newZ
-                        });
-                    }
-                    
-                    // Right controller - turning
-                    if (this.el.id === 'rightController') {
-                        const turnSpeed = 2;
-                        const newRotationY = cameraRotation.y + (evt.detail.x * turnSpeed);
-                        
-                        camera.setAttribute('rotation', {
-                            x: cameraRotation.x,
-                            y: newRotationY,
-                            z: cameraRotation.z
-                        });
-                    }
-                }
-            }
-        });
-
         let score = 0;
         const scoreElement = document.getElementById('score');
         const instructionsElement = document.getElementById('instructions');
@@ -240,13 +163,31 @@
                 coin.setAttribute('color', '#DAA520');
                 coin.setAttribute('animation', 'property: rotation; to: 0 360 0; loop: true; dur: 3000');
                 
-                // Add click listener for both desktop and VR
-                coin.addEventListener('click', handleCoinClick);
-                coin.addEventListener('raycaster-intersected', function() {
-                    this.setAttribute('color', '#FFD700');
-                });
-                coin.addEventListener('raycaster-intersected-cleared', function() {
-                    this.setAttribute('color', '#DAA520');
+                // Add click listener
+                coin.addEventListener('click', function() {
+                    // Remove the coin
+                    this.remove();
+                    
+                    // Add to score
+                    score += 1;
+                    scoreElement.textContent = `Score: ${score} / 15`;
+                    
+                    // Move to next coin
+                    currentCoinIndex += 1;
+                    
+                    if (score < 15) {
+                        instructionsElement.textContent = `Great! Find coin ${score + 1} of 15`;
+                        // Create next coin after a short delay
+                        setTimeout(() => {
+                            createNextCoin();
+                        }, 500);
+                    } else {
+                        // All coins collected
+                        instructionsElement.textContent = 'Amazing! All coins found!';
+                        setTimeout(() => {
+                            alert('Congratulations! You found all 15 treasure coins!');
+                        }, 100);
+                    }
                 });
                 
                 // Add to scene
@@ -255,35 +196,11 @@
             }
         }
         
-        function handleCoinClick() {
-            // Remove the coin
-            this.remove();
-            
-            // Add to score
-            score += 1;
-            scoreElement.textContent = `Score: ${score} / 15`;
-            
-            // Move to next coin
-            currentCoinIndex += 1;
-            
-            if (score < 15) {
-                instructionsElement.textContent = `Great! Find coin ${score + 1} of 15`;
-                setTimeout(() => {
-                    createNextCoin();
-                }, 500);
-            } else {
-                instructionsElement.textContent = 'Amazing! All coins found!';
-                setTimeout(() => {
-                    alert('Congratulations! You found all 15 treasure coins!');
-                }, 100);
-            }
-        }
-        
-        // Start the game
+        // Start the game by creating the first coin
         document.addEventListener('DOMContentLoaded', function() {
             setTimeout(() => {
                 createNextCoin();
-            }, 1000);
+            }, 1000); // Wait 1 second for scene to load
         });
     </script>
 </body>
