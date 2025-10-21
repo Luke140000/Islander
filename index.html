@@ -35,38 +35,35 @@
     <a-scene background="color: skyblue" vr-mode-ui="enabled: true">
         <!-- VR Camera Rig for movement -->
         <a-entity id="cameraRig" 
-                  movement-controls="fly: false; constrainToNavMesh: false"
-                  position="0 0 0">
+                  position="0 0 3"
+                  movement-controls="fly: false; constrainToNavMesh: false; speed: 0.1">
             
-            <!-- Camera with both desktop and VR controls -->
-            <a-camera position="0 1.6 3" 
+            <!-- Camera -->
+            <a-camera position="0 1.6 0" 
                      look-controls="pointerLockEnabled: true"
                      wasd-controls="acceleration: 20; fly: false">
                 
-                <!-- Desktop cursor (only visible in non-VR) -->
+                <!-- Desktop cursor -->
                 <a-cursor position="0 0 -1" 
                          geometry="primitive: ring; radiusInner: 0.02; radiusOuter: 0.03" 
                          material="color: white; shader: flat" 
                          animation__click="property: scale; startEvents: click; from: 0.1 0.1 0.1; to: 1 1 1; dur: 150"
-                         animation__fusing="property: scale; startEvents: fusing; from: 1 1 1; to: 0.1 0.1 0.1; dur: 1500"
                          raycaster="objects: .coin"
                          visible="true"></a-cursor>
             </a-camera>
             
-            <!-- Left VR Controller -->
+            <!-- Left VR Controller with thumbstick movement -->
             <a-entity id="leftController"
                      oculus-touch-controls="hand: left"
-                     teleport-controls="cameraRig: #cameraRig; teleportOrigin: #leftController; button: trigger; curveShootingSpeed: 18; landingMaxAngle: 60"
-                     raycaster="objects: .coin; lineColor: red; lineOpacity: 0.5"
-                     line="color: red; opacity: 0.5; visible: false">
+                     thumbstick-logging
+                     raycaster="objects: .coin; lineColor: red; lineOpacity: 0.5">
             </a-entity>
             
-            <!-- Right VR Controller -->
+            <!-- Right VR Controller with turning and interaction -->
             <a-entity id="rightController"
                      oculus-touch-controls="hand: right"
-                     teleport-controls="cameraRig: #cameraRig; teleportOrigin: #rightController; button: trigger; curveShootingSpeed: 18; landingMaxAngle: 60"
+                     thumbstick-logging
                      raycaster="objects: .coin; lineColor: blue; lineOpacity: 0.5"
-                     line="color: blue; opacity: 0.5; visible: false"
                      laser-controls>
             </a-entity>
         </a-entity>
@@ -158,6 +155,57 @@
     </a-scene>
 
     <script>
+        // Register custom component for thumbstick movement
+        AFRAME.registerComponent('thumbstick-logging', {
+            init: function () {
+                this.el.addEventListener('thumbstickmoved', this.logThumbstick);
+            },
+            logThumbstick: function (evt) {
+                const cameraRig = document.querySelector('#cameraRig');
+                const camera = document.querySelector('a-camera');
+                
+                if (evt.detail.x !== undefined && evt.detail.y !== undefined) {
+                    // Get current positions
+                    const rigPosition = cameraRig.getAttribute('position');
+                    const cameraRotation = camera.getAttribute('rotation');
+                    
+                    // Movement speed
+                    const speed = 0.1;
+                    
+                    // Calculate movement based on camera direction
+                    const yRotation = THREE.MathUtils.degToRad(cameraRotation.y);
+                    
+                    // Left controller - movement
+                    if (this.el.id === 'leftController') {
+                        const deltaX = evt.detail.x * speed;
+                        const deltaZ = -evt.detail.y * speed;
+                        
+                        // Apply rotation to movement
+                        const newX = rigPosition.x + (deltaX * Math.cos(yRotation) - deltaZ * Math.sin(yRotation));
+                        const newZ = rigPosition.z + (deltaX * Math.sin(yRotation) + deltaZ * Math.cos(yRotation));
+                        
+                        cameraRig.setAttribute('position', {
+                            x: newX,
+                            y: rigPosition.y,
+                            z: newZ
+                        });
+                    }
+                    
+                    // Right controller - turning
+                    if (this.el.id === 'rightController') {
+                        const turnSpeed = 2;
+                        const newRotationY = cameraRotation.y + (evt.detail.x * turnSpeed);
+                        
+                        camera.setAttribute('rotation', {
+                            x: cameraRotation.x,
+                            y: newRotationY,
+                            z: cameraRotation.z
+                        });
+                    }
+                }
+            }
+        });
+
         let score = 0;
         const scoreElement = document.getElementById('score');
         const instructionsElement = document.getElementById('instructions');
@@ -195,11 +243,9 @@
                 // Add click listener for both desktop and VR
                 coin.addEventListener('click', handleCoinClick);
                 coin.addEventListener('raycaster-intersected', function() {
-                    // Visual feedback when pointing at coin in VR
                     this.setAttribute('color', '#FFD700');
                 });
                 coin.addEventListener('raycaster-intersected-cleared', function() {
-                    // Return to normal color
                     this.setAttribute('color', '#DAA520');
                 });
                 
@@ -222,12 +268,10 @@
             
             if (score < 15) {
                 instructionsElement.textContent = `Great! Find coin ${score + 1} of 15`;
-                // Create next coin after a short delay
                 setTimeout(() => {
                     createNextCoin();
                 }, 500);
             } else {
-                // All coins collected
                 instructionsElement.textContent = 'Amazing! All coins found!';
                 setTimeout(() => {
                     alert('Congratulations! You found all 15 treasure coins!');
@@ -235,11 +279,11 @@
             }
         }
         
-        // Start the game by creating the first coin
+        // Start the game
         document.addEventListener('DOMContentLoaded', function() {
             setTimeout(() => {
                 createNextCoin();
-            }, 1000); // Wait 1 second for scene to load
+            }, 1000);
         });
     </script>
 </body>
