@@ -124,83 +124,83 @@
         <a-sphere position="-16 1.2 3" radius="1.2" color="darkgreen"></a-sphere>
         <a-sphere position="0 1.2 -11" radius="1.2" color="darkgreen"></a-sphere>
         
-        <!-- 15 PROGRESSIVE TREASURE COINS - Only first one visible initially -->
-        <a-cylinder class="coin" id="coin0" position="3 0.2 1" radius="0.08" height="0.02" color="#DAA520" 
-                   animation="property: rotation; to: 0 360 0; loop: true; dur: 3000"></a-cylinder>
-        
-        <a-cylinder class="coin" id="coin1" position="-7 0.2 -1" radius="0.08" height="0.02" color="#DAA520" 
-                   animation="property: rotation; to: 0 360 0; loop: true; dur: 3000" visible="false"></a-cylinder>
-        
-        <a-cylinder class="coin" id="coin2" position="13 0.2 6" radius="0.08" height="0.02" color="#DAA520" 
-                   animation="property: rotation; to: 0 360 0; loop: true; dur: 3000" visible="false"></a-cylinder>
-        
-        <a-cylinder class="coin" id="coin3" position="-5 0.2 10" radius="0.08" height="0.02" color="#DAA520" 
-                   animation="property: rotation; to: 0 360 0; loop: true; dur: 3000" visible="false"></a-cylinder>
-        
-        <a-cylinder class="coin" id="coin4" position="16 0.2 -8" radius="0.08" height="0.02" color="#DAA520" 
-                   animation="property: rotation; to: 0 360 0; loop: true; dur: 3000" visible="false"></a-cylinder>
-        
-        <a-cylinder class="coin" id="coin5" position="-14 0.2 -7" radius="0.08" height="0.02" color="#DAA520" 
-                   animation="property: rotation; to: 0 360 0; loop: true; dur: 3000" visible="false"></a-cylinder>
-        
-        <a-cylinder class="coin" id="coin6" position="7 0.2 -4" radius="0.08" height="0.02" color="#DAA520" 
-                   animation="property: rotation; to: 0 360 0; loop: true; dur: 3000" visible="false"></a-cylinder>
-        
-        <a-cylinder class="coin" id="coin7" position="-1 0.2 -13" radius="0.08" height="0.02" color="#DAA520" 
-                   animation="property: rotation; to: 0 360 0; loop: true; dur: 3000" visible="false"></a-cylinder>
-        
-        <a-cylinder class="coin" id="coin8" position="19 0.2 8" radius="0.08" height="0.02" color="#DAA520" 
-                   animation="property: rotation; to: 0 360 0; loop: true; dur: 3000" visible="false"></a-cylinder>
-        
-        <a-cylinder class="coin" id="coin9" position="-17 0.2 -10" radius="0.08" height="0.02" color="#DAA520" 
-                   animation="property: rotation; to: 0 360 0; loop: true; dur: 3000" visible="false"></a-cylinder>
-        
-        <a-cylinder class="coin" id="coin10" position="2 0.2 -16" radius="0.08" height="0.02" color="#DAA520" 
-                   animation="property: rotation; to: 0 360 0; loop: true; dur: 3000" visible="false"></a-cylinder>
-        
-        <a-cylinder class="coin" id="coin11" position="-12 0.2 14" radius="0.08" height="0.02" color="#DAA520" 
-                   animation="property: rotation; to: 0 360 0; loop: true; dur: 3000" visible="false"></a-cylinder>
-        
-        <a-cylinder class="coin" id="coin12" position="22 0.2 -1" radius="0.08" height="0.02" color="#DAA520" 
-                   animation="property: rotation; to: 0 360 0; loop: true; dur: 3000" visible="false"></a-cylinder>
-        
-        <a-cylinder class="coin" id="coin13" position="-8 0.2 -20" radius="0.08" height="0.02" color="#DAA520" 
-                   animation="property: rotation; to: 0 360 0; loop: true; dur: 3000" visible="false"></a-cylinder>
-        
-        <a-cylinder class="coin" id="coin14" position="6 0.2 21" radius="0.08" height="0.02" color="#DAA520" 
-                   animation="property: rotation; to: 0 360 0; loop: true; dur: 3000" visible="false"></a-cylinder>
+        <!-- Container for dynamically created coins -->
+        <a-entity id="coin-container"></a-entity>
     </a-scene>
 
     <script>
         let score = 0;
         const scoreElement = document.getElementById('score');
         const instructionsElement = document.getElementById('instructions');
-
-        // Add click listeners to all coins
-        document.querySelectorAll('.coin').forEach((coin, index) => {
-            coin.addEventListener('click', function() {
-                // Remove the coin
-                this.remove();
+        
+        // 15 possible coin locations
+        const coinLocations = [
+            "3 0.2 1", "-7 0.2 -1", "13 0.2 6", "-5 0.2 10", "16 0.2 -8",
+            "-14 0.2 -7", "7 0.2 -4", "-1 0.2 -13", "19 0.2 8", "-17 0.2 -10",
+            "2 0.2 -16", "-12 0.2 14", "22 0.2 -1", "-8 0.2 -20", "6 0.2 21"
+        ];
+        
+        // Shuffle the locations randomly
+        let shuffledLocations = [...coinLocations];
+        for (let i = shuffledLocations.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [shuffledLocations[i], shuffledLocations[j]] = [shuffledLocations[j], shuffledLocations[i]];
+        }
+        
+        let currentCoinIndex = 0;
+        let currentCoin = null;
+        
+        function createNextCoin() {
+            if (currentCoinIndex < 15) {
+                const coinContainer = document.getElementById('coin-container');
                 
-                // Add to score
-                score += 1;
-                scoreElement.textContent = `Score: ${score} / 15`;
+                // Create new coin element
+                const coin = document.createElement('a-cylinder');
+                coin.setAttribute('class', 'coin');
+                coin.setAttribute('position', shuffledLocations[currentCoinIndex]);
+                coin.setAttribute('radius', '0.08');
+                coin.setAttribute('height', '0.02');
+                coin.setAttribute('color', '#DAA520');
+                coin.setAttribute('animation', 'property: rotation; to: 0 360 0; loop: true; dur: 3000');
                 
-                // Show next coin if there is one
-                if (score < 15) {
-                    const nextCoin = document.getElementById(`coin${score}`);
-                    if (nextCoin) {
-                        nextCoin.setAttribute('visible', 'true');
+                // Add click listener
+                coin.addEventListener('click', function() {
+                    // Remove the coin
+                    this.remove();
+                    
+                    // Add to score
+                    score += 1;
+                    scoreElement.textContent = `Score: ${score} / 15`;
+                    
+                    // Move to next coin
+                    currentCoinIndex += 1;
+                    
+                    if (score < 15) {
                         instructionsElement.textContent = `Great! Find coin ${score + 1} of 15`;
+                        // Create next coin after a short delay
+                        setTimeout(() => {
+                            createNextCoin();
+                        }, 500);
+                    } else {
+                        // All coins collected
+                        instructionsElement.textContent = 'Amazing! All coins found!';
+                        setTimeout(() => {
+                            alert('Congratulations! You found all 15 treasure coins!');
+                        }, 100);
                     }
-                } else {
-                    // All coins collected
-                    instructionsElement.textContent = 'Amazing! All coins found!';
-                    setTimeout(() => {
-                        alert('Congratulations! You found all 15 treasure coins!');
-                    }, 100);
-                }
-            });
+                });
+                
+                // Add to scene
+                coinContainer.appendChild(coin);
+                currentCoin = coin;
+            }
+        }
+        
+        // Start the game by creating the first coin
+        document.addEventListener('DOMContentLoaded', function() {
+            setTimeout(() => {
+                createNextCoin();
+            }, 1000); // Wait 1 second for scene to load
         });
     </script>
 </body>
