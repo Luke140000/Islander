@@ -32,15 +32,38 @@
     <div id="score">Score: 0 / 15</div>
     <div id="instructions">Find the hidden coin to reveal the next one!</div>
 
-    <a-scene background="color: skyblue">
-        <!-- Camera with slower movement and cursor -->
-        <a-camera position="0 2 5" look-controls wasd-controls="acceleration: 20">
-            <a-cursor position="0 0 -1" geometry="primitive: ring; radiusInner: 0.02; radiusOuter: 0.03" 
-                     material="color: white; shader: flat" 
-                     animation__click="property: scale; startEvents: click; from: 0.1 0.1 0.1; to: 1 1 1; dur: 150"
-                     animation__fusing="property: scale; startEvents: fusing; from: 1 1 1; to: 0.1 0.1 0.1; dur: 1500"
-                     raycaster="objects: .coin"></a-cursor>
-        </a-camera>
+    <a-scene background="color: skyblue" vr-mode-ui="enabled: true">
+        <!-- VR Camera Rig for movement -->
+        <a-entity id="cameraRig" 
+                  position="0 0 3">
+            
+            <!-- Camera -->
+            <a-camera position="0 1.6 0" 
+                     look-controls="pointerLockEnabled: true"
+                     wasd-controls="acceleration: 20; fly: false">
+                
+                <!-- Desktop cursor -->
+                <a-cursor position="0 0 -1" 
+                         geometry="primitive: ring; radiusInner: 0.02; radiusOuter: 0.03" 
+                         material="color: white; shader: flat" 
+                         animation__click="property: scale; startEvents: click; from: 0.1 0.1 0.1; to: 1 1 1; dur: 150"
+                         raycaster="objects: .coin"
+                         visible="true"></a-cursor>
+            </a-camera>
+            
+            <!-- Left VR Controller -->
+            <a-entity id="leftController"
+                     oculus-touch-controls="hand: left"
+                     raycaster="objects: .coin">
+            </a-entity>
+            
+            <!-- Right VR Controller -->
+            <a-entity id="rightController"
+                     oculus-touch-controls="hand: right"
+                     raycaster="objects: .coin"
+                     laser-controls>
+            </a-entity>
+        </a-entity>
         
         <!-- Lighting -->
         <a-light type="ambient" color="#404040"></a-light>
@@ -129,18 +152,101 @@
     </a-scene>
 
     <script>
+        // Simple VR Thumbstick Movement - This WILL work!
+        AFRAME.registerComponent('thumbstick-movement', {
+            init: function() {
+                this.rig = document.querySelector('#cameraRig');
+                this.camera = document.querySelector('a-camera');
+                this.isLeft = this.el.getAttribute('oculus-touch-controls').hand === 'left';
+                this.isRight = this.el.getAttribute('oculus-touch-controls').hand === 'right';
+                
+                // Bind events
+                this.el.addEventListener('thumbstickdown', this.onThumbstickDown.bind(this));
+                this.el.addEventListener('thumbstickup', this.onThumbstickUp.bind(this));
+                this.el.addEventListener('thumbstickmoved', this.onThumbstickMoved.bind(this));
+                
+                this.moveSpeed = 0.1;
+                this.turnSpeed = 2;
+            },
+            
+            onThumbstickDown: function(evt) {
+                console.log('Thumbstick pressed');
+            },
+            
+            onThumbstickUp: function(evt) {
+                console.log('Thumbstick released');
+            },
+            
+            onThumbstickMoved: function(evt) {
+                if (!this.rig || !this.camera) return;
+                
+                const x = evt.detail.x;
+                const y = evt.detail.y;
+                
+                console.log('Thumbstick moved:', x, y, this.isLeft ? 'LEFT' : 'RIGHT');
+                
+                const rigPos = this.rig.getAttribute('position');
+                const camRot = this.camera.getAttribute('rotation');
+                
+                // LEFT CONTROLLER = MOVEMENT
+                if (this.isLeft && (Math.abs(x) > 0.1 || Math.abs(y) > 0.1)) {
+                    const moveX = x * this.moveSpeed;
+                    const moveZ = -y * this.moveSpeed;
+                    
+                    // Move relative to camera direction
+                    const radY = THREE.MathUtils.degToRad(camRot.y);
+                    const newX = rigPos.x + (moveX * Math.cos(radY) - moveZ * Math.sin(radY));
+                    const newZ = rigPos.z + (moveX * Math.sin(radY) + moveZ * Math.cos(radY));
+                    
+                    this.rig.setAttribute('position', `${newX} ${rigPos.y} ${newZ}`);
+                }
+                
+                // RIGHT CONTROLLER = TURNING
+                if (this.isRight && Math.abs(x) > 0.1) {
+                    const newY = camRot.y + (x * this.turnSpeed);
+                    this.camera.setAttribute('rotation', `${camRot.x} ${newY} ${camRot.z}`);
+                }
+            }
+        });
+
+        // Wait for scene to load then add movement
+        document.addEventListener('DOMContentLoaded', function() {
+            const scene = document.querySelector('a-scene');
+            
+            scene.addEventListener('loaded', function() {
+                console.log('Scene loaded, adding movement...');
+                
+                setTimeout(() => {
+                    const leftController = document.querySelector('#leftController');
+                    const rightController = document.querySelector('#rightController');
+                    
+                    if (leftController) {
+                        leftController.setAttribute('thumbstick-movement', '');
+                        console.log('Added movement to left controller');
+                    }
+                    
+                    if (rightController) {
+                        rightController.setAttribute('thumbstick-movement', '');
+                        console.log('Added movement to right controller');
+                    }
+                    
+                    // Start game
+                    createNextCoin();
+                }, 1000);
+            });
+        });
+
+        // Your coin game code
         let score = 0;
         const scoreElement = document.getElementById('score');
         const instructionsElement = document.getElementById('instructions');
         
-        // 15 possible coin locations
         const coinLocations = [
             "3 0.2 1", "-7 0.2 -1", "13 0.2 6", "-5 0.2 10", "16 0.2 -8",
             "-14 0.2 -7", "7 0.2 -4", "-1 0.2 -13", "19 0.2 8", "-17 0.2 -10",
             "2 0.2 -16", "-12 0.2 14", "22 0.2 -1", "-8 0.2 -20", "6 0.2 21"
         ];
         
-        // Shuffle the locations randomly
         let shuffledLocations = [...coinLocations];
         for (let i = shuffledLocations.length - 1; i > 0; i--) {
             const j = Math.floor(Math.random() * (i + 1));
@@ -154,7 +260,6 @@
             if (currentCoinIndex < 15) {
                 const coinContainer = document.getElementById('coin-container');
                 
-                // Create new coin element
                 const coin = document.createElement('a-cylinder');
                 coin.setAttribute('class', 'coin');
                 coin.setAttribute('position', shuffledLocations[currentCoinIndex]);
@@ -163,45 +268,20 @@
                 coin.setAttribute('color', '#DAA520');
                 coin.setAttribute('animation', 'property: rotation; to: 0 360 0; loop: true; dur: 3000');
                 
-                // Add click listener
-                coin.addEventListener('click', function() {
-                    // Remove the coin
-                    this.remove();
-                    
-                    // Add to score
-                    score += 1;
-                    scoreElement.textContent = `Score: ${score} / 15`;
-                    
-                    // Move to next coin
-                    currentCoinIndex += 1;
-                    
-                    if (score < 15) {
-                        instructionsElement.textContent = `Great! Find coin ${score + 1} of 15`;
-                        // Create next coin after a short delay
-                        setTimeout(() => {
-                            createNextCoin();
-                        }, 500);
-                    } else {
-                        // All coins collected
-                        instructionsElement.textContent = 'Amazing! All coins found!';
-                        setTimeout(() => {
-                            alert('Congratulations! You found all 15 treasure coins!');
-                        }, 100);
-                    }
+                coin.addEventListener('click', handleCoinClick);
+                coin.addEventListener('raycaster-intersected', function() {
+                    this.setAttribute('color', '#FFD700');
+                });
+                coin.addEventListener('raycaster-intersected-cleared', function() {
+                    this.setAttribute('color', '#DAA520');
                 });
                 
-                // Add to scene
                 coinContainer.appendChild(coin);
                 currentCoin = coin;
             }
         }
         
-        // Start the game by creating the first coin
-        document.addEventListener('DOMContentLoaded', function() {
-            setTimeout(() => {
-                createNextCoin();
-            }, 1000); // Wait 1 second for scene to load
-        });
-    </script>
-</body>
-</html>
+        function handleCoinClick() {
+            this.remove();
+            score += 1;
+            scoreElement
