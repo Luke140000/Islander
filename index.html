@@ -39,8 +39,9 @@
             
             <!-- Camera -->
             <a-camera position="0 1.6 0" 
-                     look-controls="pointerLockEnabled: true"
-                     wasd-controls="acceleration: 20; fly: false">
+         look-controls="pointerLockEnabled: true"
+         wasd-controls="acceleration: 20; fly: false"
+         boundary-check>
                 
                 <!-- Desktop cursor -->
                 <a-cursor position="0 0 -1" 
@@ -164,9 +165,50 @@
                 this.el.addEventListener('thumbstickdown', this.onThumbstickDown.bind(this));
                 this.el.addEventListener('thumbstickup', this.onThumbstickUp.bind(this));
                 this.el.addEventListener('thumbstickmoved', this.onThumbstickMoved.bind(this));
-                
+                gameOver: function() {
+    // Stop the game
+    const coinContainer = document.getElementById('coin-container');
+    if (coinContainer) {
+        coinContainer.innerHTML = ''; // Remove current coin
+    }
+    
+    // Show game over message
+    setTimeout(() => {
+        const playAgain = confirm('You fell off the island! Game Over.\n\nWould you like to play again?');
+        if (playAgain) {
+            // Reset game
+            this.resetGame();
+        }
+    }, 500);
+},
+
+resetGame: function() {
+    // Reset player position
+    this.rig.setAttribute('position', '0 0 3');
+    this.camera.setAttribute('rotation', '0 0 0');
+    
+    // Reset score
+    score = 0;
+    currentCoinIndex = 0;
+    document.getElementById('score').textContent = 'Score: 0 / 15';
+    document.getElementById('instructions').textContent = 'Find the hidden coin to reveal the next one!';
+    
+    // Shuffle coin locations again
+    shuffledLocations = [...coinLocations];
+    for (let i = shuffledLocations.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [shuffledLocations[i], shuffledLocations[j]] = [shuffledLocations[j], shuffledLocations[i]];
+    }
+    
+    // Start new game
+    setTimeout(() => {
+        createNextCoin();
+    }, 1000);
+}
+
                 this.moveSpeed = 0.1;
                 this.turnSpeed = 2;
+                this.islandRadius = 25; // Match your island size
             },
             
             onThumbstickDown: function(evt) {
@@ -194,11 +236,19 @@
                     const moveZ = -y * this.moveSpeed;
                     
                     // Move relative to camera direction
-                    const radY = THREE.MathUtils.degToRad(camRot.y);
-                    const newX = rigPos.x + (moveX * Math.cos(radY) - moveZ * Math.sin(radY));
-                    const newZ = rigPos.z + (moveX * Math.sin(radY) + moveZ * Math.cos(radY));
-                    
-                    this.rig.setAttribute('position', `${newX} ${rigPos.y} ${newZ}`);
+const radY = THREE.MathUtils.degToRad(camRot.y);
+const newX = rigPos.x + (moveX * Math.cos(radY) - moveZ * Math.sin(radY));
+const newZ = rigPos.z + (moveX * Math.sin(radY) + moveZ * Math.cos(radY));
+
+// Check if new position is within island bounds
+const distanceFromCenter = Math.sqrt(newX * newX + newZ * newZ);
+if (distanceFromCenter > this.islandRadius) {
+    // Player fell off the island!
+    this.gameOver();
+    return;
+}
+
+this.rig.setAttribute('position', `${newX} ${rigPos.y} ${newZ}`);
                 }
                 
                 // RIGHT CONTROLLER = TURNING
@@ -208,6 +258,69 @@
                 }
             }
         });
+// Boundary check for desktop WASD movement
+AFRAME.registerComponent('boundary-check', {
+    init: function() {
+        this.rig = document.querySelector('#cameraRig');
+        this.islandRadius = 25;
+        this.checkInterval = setInterval(this.checkBounds.bind(this), 100);
+    },
+    
+    checkBounds: function() {
+        if (!this.rig) return;
+        
+        const rigPos = this.rig.getAttribute('position');
+        const distanceFromCenter = Math.sqrt(rigPos.x * rigPos.x + rigPos.z * rigPos.z);
+        
+        if (distanceFromCenter > this.islandRadius) {
+            this.gameOver();
+        }
+    },
+    
+    gameOver: function() {
+        clearInterval(this.checkInterval);
+        
+        // Remove current coin
+        const coinContainer = document.getElementById('coin-container');
+        if (coinContainer) {
+            coinContainer.innerHTML = '';
+        }
+        
+        setTimeout(() => {
+            const playAgain = confirm('You fell off the island! Game Over.\n\nWould you like to play again?');
+            if (playAgain) {
+                this.resetGame();
+            }
+        }, 500);
+    },
+    
+    resetGame: function() {
+        // Reset player position
+        this.rig.setAttribute('position', '0 0 3');
+        this.el.setAttribute('rotation', '0 0 0');
+        
+        // Reset score
+        score = 0;
+        currentCoinIndex = 0;
+        document.getElementById('score').textContent = 'Score: 0 / 15';
+        document.getElementById('instructions').textContent = 'Find the hidden coin to reveal the next one!';
+        
+        // Shuffle coin locations again
+        shuffledLocations = [...coinLocations];
+        for (let i = shuffledLocations.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [shuffledLocations[i], shuffledLocations[j]] = [shuffledLocations[j], shuffledLocations[i]];
+        }
+        
+        // Restart boundary checking
+        this.checkInterval = setInterval(this.checkBounds.bind(this), 100);
+        
+        // Start new game
+        setTimeout(() => {
+            createNextCoin();
+        }, 1000);
+    }
+});
 
         // Wait for scene to load then add movement
         document.addEventListener('DOMContentLoaded', function() {
