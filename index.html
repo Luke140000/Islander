@@ -25,23 +25,33 @@
             border-radius: 5px;
             z-index: 100;
         }
+        #controls {
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            font-size: 14px;
+            color: white;
+            background: rgba(0,0,0,0.7);
+            padding: 10px;
+            border-radius: 5px;
+            z-index: 100;
+        }
     </style>
 </head>
 <body>
-    <!-- Score and instructions display -->
+    <!-- UI Display -->
     <div id="score">Score: 0 / 15</div>
     <div id="instructions">Find the hidden coin to reveal the next one!</div>
+    <div id="controls">PC: WASD=Move, Mouse=Look, Click=Point, F/G=Gestures, Space=Reach</div>
 
     <a-scene background="color: skyblue" vr-mode-ui="enabled: true">
         <!-- VR Camera Rig for movement -->
-        <a-entity id="cameraRig" 
-                  position="0 0 3">
+        <a-entity id="cameraRig" position="0 0 3">
             
             <!-- Camera -->
             <a-camera position="0 1.6 0" 
-         look-controls="pointerLockEnabled: true"
-         wasd-controls="acceleration: 20; fly: false"
-         boundary-check>
+                     look-controls="pointerLockEnabled: true"
+                     wasd-controls="acceleration: 20; fly: false">
                 
                 <!-- Desktop cursor -->
                 <a-cursor position="0 0 -1" 
@@ -52,17 +62,36 @@
                          visible="true"></a-cursor>
             </a-camera>
             
-            <!-- Left VR Controller -->
+            <!-- Left VR Controller with Hand -->
             <a-entity id="leftController"
                      oculus-touch-controls="hand: left"
-                     raycaster="objects: .coin">
+                     hand-controls="hand: left; handModelStyle: lowPoly; color: #ffdbac"
+                     raycaster="objects: .coin"
+                     hand-animation>
             </a-entity>
             
-            <!-- Right VR Controller -->
+            <!-- Right VR Controller with Hand -->
             <a-entity id="rightController"
                      oculus-touch-controls="hand: right"
+                     hand-controls="hand: right; handModelStyle: lowPoly; color: #ffdbac"
                      raycaster="objects: .coin"
-                     laser-controls>
+                     laser-controls
+                     hand-animation>
+            </a-entity>
+            
+            <!-- PC Hands (visible only in desktop mode) -->
+            <a-entity id="pcLeftHand" 
+                     position="-0.3 -0.5 -0.8"
+                     hand-controls="hand: left; handModelStyle: lowPoly; color: #ffdbac"
+                     pc-hand-animation
+                     visible="true">
+            </a-entity>
+            
+            <a-entity id="pcRightHand" 
+                     position="0.3 -0.5 -0.8"
+                     hand-controls="hand: right; handModelStyle: lowPoly; color: #ffdbac" 
+                     pc-hand-animation
+                     visible="true">
             </a-entity>
         </a-entity>
         
@@ -73,7 +102,7 @@
         <!-- Island base -->
         <a-cylinder position="0 -1 0" radius="25" height="2" color="sandybrown"></a-cylinder>
         
-        <!-- All your trees -->
+        <!-- Trees -->
         <a-cylinder position="5 2 -3" radius="0.4" height="8" color="brown"></a-cylinder>
         <a-sphere position="5 6.5 -3" radius="2" color="green"></a-sphere>
         
@@ -131,7 +160,7 @@
         <a-cylinder position="1 2 -18" radius="0.4" height="8" color="brown"></a-cylinder>
         <a-sphere position="1 6.5 -18" radius="2" color="green"></a-sphere>
         
-        <!-- All your bushes -->
+        <!-- Bushes -->
         <a-sphere position="2 1.2 -1" radius="1.2" color="darkgreen"></a-sphere>
         <a-sphere position="-4 1.2 4" radius="1.2" color="darkgreen"></a-sphere>
         <a-sphere position="6 1.2 2" radius="1.2" color="darkgreen"></a-sphere>
@@ -153,7 +182,397 @@
     </a-scene>
 
     <script>
-        // Simple VR Thumbstick Movement - This WILL work!
+        // Game variables
+        let score = 0;
+        let currentCoinIndex = 0;
+        let currentCoin = null;
+        let boundaryCheckInterval = null;
+        const scoreElement = document.getElementById('score');
+        const instructionsElement = document.getElementById('instructions');
+        const islandRadius = 25;
+        
+        const coinLocations = [
+            "3 0.2 1", "-7 0.2 -1", "13 0.2 6", "-5 0.2 10", "16 0.2 -8",
+            "-14 0.2 -7", "7 0.2 -4", "-1 0.2 -13", "19 0.2 8", "-17 0.2 -10",
+            "2 0.2 -16", "-12 0.2 14", "22 0.2 -1", "-8 0.2 -20", "6 0.2 21"
+        ];
+        
+        let shuffledLocations = [...coinLocations];
+        
+        // Shuffle function
+        function shuffleLocations() {
+            shuffledLocations = [...coinLocations];
+            for (let i = shuffledLocations.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [shuffledLocations[i], shuffledLocations[j]] = [shuffledLocations[j], shuffledLocations[i]];
+            }
+        }
+        
+        // Game over function
+        function gameOver() {
+            if (boundaryCheckInterval) {
+                clearInterval(boundaryCheckInterval);
+            }
+            
+            const coinContainer = document.getElementById('coin-container');
+            if (coinContainer) {
+                coinContainer.innerHTML = '';
+            }
+            
+            setTimeout(() => {
+                const playAgain = confirm('You fell off the island! Game Over.\n\nWould you like to play again?');
+                if (playAgain) {
+                    resetGame();
+                }
+            }, 500);
+        }
+        
+        // Reset game function
+        function resetGame() {
+            const cameraRig = document.querySelector('#cameraRig');
+            const camera = document.querySelector('a-camera');
+            cameraRig.setAttribute('position', '0 0 3');
+            camera.setAttribute('rotation', '0 0 0');
+            
+            score = 0;
+            currentCoinIndex = 0;
+            scoreElement.textContent = 'Score: 0 / 15';
+            instructionsElement.textContent = 'Find the hidden coin to reveal the next one!';
+            
+            shuffleLocations();
+            startBoundaryCheck();
+            
+            setTimeout(() => {
+                createNextCoin();
+            }, 1000);
+        }
+        
+        // Boundary check function
+        function checkBounds() {
+            const cameraRig = document.querySelector('#cameraRig');
+            if (!cameraRig) return;
+            
+            const rigPos = cameraRig.getAttribute('position');
+            const distanceFromCenter = Math.sqrt(rigPos.x * rigPos.x + rigPos.z * rigPos.z);
+            
+            if (distanceFromCenter > islandRadius) {
+                gameOver();
+            }
+        }
+        
+        // Start boundary checking
+        function startBoundaryCheck() {
+            if (boundaryCheckInterval) {
+                clearInterval(boundaryCheckInterval);
+            }
+            boundaryCheckInterval = setInterval(checkBounds, 100);
+        }
+        
+        // VR Hand Animation Component
+        AFRAME.registerComponent('hand-animation', {
+            init: function() {
+                this.hand = this.el.getAttribute('hand-controls');
+                this.isLeft = this.hand && this.hand.hand === 'left';
+                this.isRight = this.hand && this.hand.hand === 'right';
+                
+                this.el.addEventListener('triggerdown', this.onTriggerDown.bind(this));
+                this.el.addEventListener('triggerup', this.onTriggerUp.bind(this));
+                this.el.addEventListener('gripdown', this.onGripDown.bind(this));
+                this.el.addEventListener('gripup', this.onGripUp.bind(this));
+                this.el.addEventListener('raycaster-intersection', this.onIntersection.bind(this));
+                this.el.addEventListener('raycaster-intersection-cleared', this.onIntersectionCleared.bind(this));
+                
+                this.isGrabbing = false;
+                this.isPointing = false;
+            },
+            
+            onTriggerDown: function(evt) {
+                this.pointingGesture();
+            },
+            
+            onTriggerUp: function(evt) {
+                            
+            onGripDown: function(evt) {
+                this.grabbingGesture();
+            },
+            
+            onGripUp: function(evt) {
+                this.relaxHand();
+            },
+            
+            onIntersection: function(evt) {
+                if (evt.detail.el.classList.contains('coin')) {
+                    this.reachingGesture();
+                }
+            },
+            
+            onIntersectionCleared: function(evt) {
+                this.relaxHand();
+            },
+            
+            pointingGesture: function() {
+                this.isPointing = true;
+                this.el.setAttribute('animation__point', {
+                    property: 'hand-controls.pose',
+                    to: 'point',
+                    dur: 200,
+                    easing: 'easeOutQuad'
+                });
+            },
+            
+            grabbingGesture: function() {
+                this.isGrabbing = true;
+                this.el.setAttribute('animation__grab', {
+                    property: 'hand-controls.pose', 
+                    to: 'fist',
+                    dur: 300,
+                    easing: 'easeOutQuad'
+                });
+                
+                this.el.setAttribute('animation__shake', {
+                    property: 'rotation',
+                    to: `${this.el.getAttribute('rotation').x + 5} ${this.el.getAttribute('rotation').y} ${this.el.getAttribute('rotation').z}`,
+                    dur: 100,
+                    direction: 'alternate',
+                    loop: 2
+                });
+            },
+            
+            reachingGesture: function() {
+                this.el.setAttribute('animation__reach', {
+                    property: 'hand-controls.pose',
+                    to: 'open',
+                    dur: 250,
+                    easing: 'easeInOutQuad'
+                });
+                
+                const currentPos = this.el.getAttribute('position');
+                this.el.setAttribute('animation__reach_forward', {
+                    property: 'position',
+                    to: `${currentPos.x} ${currentPos.y} ${currentPos.z - 0.1}`,
+                    dur: 250,
+                    easing: 'easeInOutQuad'
+                });
+            },
+            
+            relaxHand: function() {
+                this.isGrabbing = false;
+                this.isPointing = false;
+                
+                this.el.setAttribute('animation__relax', {
+                    property: 'hand-controls.pose',
+                    to: 'open',
+                    dur: 300,
+                    easing: 'easeOutQuad'
+                });
+                
+                this.el.removeAttribute('animation__reach_forward');
+                this.el.removeAttribute('animation__shake');
+            },
+            
+            celebrateGesture: function() {
+                this.el.setAttribute('animation__celebrate', {
+                    property: 'rotation',
+                    to: `${this.el.getAttribute('rotation').x} ${this.el.getAttribute('rotation').y + 45} ${this.el.getAttribute('rotation').z}`,
+                    dur: 500,
+                    direction: 'alternate',
+                    loop: 2,
+                    easing: 'easeInOutQuad'
+                });
+                
+                setTimeout(() => {
+                    this.relaxHand();
+                }, 1000);
+            }
+        });
+
+        // PC Hand Animation Component
+        AFRAME.registerComponent('pc-hand-animation', {
+            init: function() {
+                this.camera = document.querySelector('a-camera');
+                this.isLeft = this.el.id === 'pcLeftHand';
+                this.isRight = this.el.id === 'pcRightHand';
+                
+                document.querySelector('a-scene').addEventListener('enter-vr', () => {
+                    this.el.setAttribute('visible', false);
+                });
+                
+                document.querySelector('a-scene').addEventListener('exit-vr', () => {
+                    this.el.setAttribute('visible', true);
+                });
+                
+                document.addEventListener('mousedown', this.onMouseDown.bind(this));
+                document.addEventListener('mouseup', this.onMouseUp.bind(this));
+                document.addEventListener('mousemove', this.onMouseMove.bind(this));
+                document.addEventListener('keydown', this.onKeyDown.bind(this));
+                document.addEventListener('keyup', this.onKeyUp.bind(this));
+                
+                this.mouseX = 0;
+                this.mouseY = 0;
+                this.isClicking = false;
+                this.isGrabbing = false;
+                
+                this.tick = this.tick.bind(this);
+            },
+            
+            onMouseDown: function(evt) {
+                if (evt.button === 0) {
+                    this.isClicking = true;
+                    if (this.isRight) {
+                        this.pointingGesture();
+                    }
+                } else if (evt.button === 2) {
+                    this.isGrabbing = true;
+                    if (this.isLeft) {
+                        this.grabbingGesture();
+                    }
+                }
+            },
+            
+            onMouseUp: function(evt) {
+                if (evt.button === 0) {
+                    this.isClicking = false;
+                    if (this.isRight) {
+                        this.relaxHand();
+                    }
+                } else if (evt.button === 2) {
+                    this.isGrabbing = false;
+                    if (this.isLeft) {
+                        this.relaxHand();
+                    }
+                }
+            },
+            
+            onMouseMove: function(evt) {
+                this.mouseX = (evt.clientX / window.innerWidth - 0.5) * 2;
+                this.mouseY = -(evt.clientY / window.innerHeight - 0.5) * 2;
+            },
+            
+            onKeyDown: function(evt) {
+                switch(evt.key.toLowerCase()) {
+                    case 'f':
+                        if (this.isLeft) {
+                            this.grabbingGesture();
+                        }
+                        break;
+                    case 'g':
+                        if (this.isRight) {
+                            this.pointingGesture();
+                        }
+                        break;
+                    case ' ':
+                        this.reachingGesture();
+                        break;
+                }
+            },
+            
+            onKeyUp: function(evt) {
+                switch(evt.key.toLowerCase()) {
+                    case 'f':
+                    case 'g':
+                    case ' ':
+                        this.relaxHand();
+                        break;
+                }
+            },
+            
+            tick: function() {
+                if (!this.camera) return;
+                
+                const currentPos = this.el.getAttribute('position');
+                const cameraPos = this.camera.getAttribute('position');
+                
+                const targetX = this.isLeft ? 
+                    cameraPos.x - 0.3 + (this.mouseX * 0.2) : 
+                    cameraPos.x + 0.3 + (this.mouseX * 0.2);
+                const targetY = cameraPos.y - 0.5 + (this.mouseY * 0.1);
+                const targetZ = cameraPos.z - 0.8;
+                
+                const lerpFactor = 0.1;
+                const newX = currentPos.x + (targetX - currentPos.x) * lerpFactor;
+                const newY = currentPos.y + (targetY - currentPos.y) * lerpFactor;
+                const newZ = currentPos.z + (targetZ - currentPos.z) * lerpFactor;
+                
+                this.el.setAttribute('position', `${newX} ${newY} ${newZ}`);
+                
+                const lookRotation = this.isLeft ? 
+                    `0 ${15 + this.mouseX * 10} 0` : 
+                    `0 ${-15 + this.mouseX * 10} 0`;
+                this.el.setAttribute('rotation', lookRotation);
+            },
+            
+            pointingGesture: function() {
+                this.el.setAttribute('animation__point', {
+                    property: 'hand-controls.pose',
+                    to: 'point',
+                    dur: 200,
+                    easing: 'easeOutQuad'
+                });
+            },
+            
+            grabbingGesture: function() {
+                this.el.setAttribute('animation__grab', {
+                    property: 'hand-controls.pose',
+                    to: 'fist', 
+                    dur: 300,
+                    easing: 'easeOutQuad'
+                });
+                
+                this.el.setAttribute('animation__shake', {
+                    property: 'position',
+                    to: `${this.el.getAttribute('position').x} ${this.el.getAttribute('position').y + 0.05} ${this.el.getAttribute('position').z}`,
+                    dur: 100,
+                    direction: 'alternate',
+                    loop: 2
+                });
+            },
+            
+            reachingGesture: function() {
+                this.el.setAttribute('animation__reach', {
+                    property: 'hand-controls.pose',
+                    to: 'open',
+                    dur: 250,
+                    easing: 'easeInOutQuad'
+                });
+                
+                const currentPos = this.el.getAttribute('position');
+                this.el.setAttribute('animation__reach_forward', {
+                    property: 'position',
+                    to: `${currentPos.x} ${currentPos.y} ${currentPos.z - 0.2}`,
+                    dur: 250,
+                    easing: 'easeInOutQuad'
+                });
+            },
+            
+            relaxHand: function() {
+                this.el.setAttribute('animation__relax', {
+                    property: 'hand-controls.pose',
+                    to: 'open',
+                    dur: 300,
+                    easing: 'easeOutQuad'
+                });
+                
+                this.el.removeAttribute('animation__reach_forward');
+                this.el.removeAttribute('animation__shake');
+            },
+            
+            celebrateGesture: function() {
+                this.el.setAttribute('animation__celebrate', {
+                    property: 'rotation',
+                    to: `0 ${this.isLeft ? 45 : -45} 0`,
+                    dur: 500,
+                    direction: 'alternate', 
+                    loop: 2,
+                    easing: 'easeInOutQuad'
+                });
+                
+                setTimeout(() => {
+                    this.relaxHand();
+                }, 1000);
+            }
+        });
+
+        // VR Thumbstick Movement Component
         AFRAME.registerComponent('thumbstick-movement', {
             init: function() {
                 this.rig = document.querySelector('#cameraRig');
@@ -161,54 +580,12 @@
                 this.isLeft = this.el.getAttribute('oculus-touch-controls').hand === 'left';
                 this.isRight = this.el.getAttribute('oculus-touch-controls').hand === 'right';
                 
-                // Bind events
                 this.el.addEventListener('thumbstickdown', this.onThumbstickDown.bind(this));
                 this.el.addEventListener('thumbstickup', this.onThumbstickUp.bind(this));
                 this.el.addEventListener('thumbstickmoved', this.onThumbstickMoved.bind(this));
-                gameOver: function() {
-    // Stop the game
-    const coinContainer = document.getElementById('coin-container');
-    if (coinContainer) {
-        coinContainer.innerHTML = ''; // Remove current coin
-    }
-    
-    // Show game over message
-    setTimeout(() => {
-        const playAgain = confirm('You fell off the island! Game Over.\n\nWould you like to play again?');
-        if (playAgain) {
-            // Reset game
-            this.resetGame();
-        }
-    }, 500);
-},
-
-resetGame: function() {
-    // Reset player position
-    this.rig.setAttribute('position', '0 0 3');
-    this.camera.setAttribute('rotation', '0 0 0');
-    
-    // Reset score
-    score = 0;
-    currentCoinIndex = 0;
-    document.getElementById('score').textContent = 'Score: 0 / 15';
-    document.getElementById('instructions').textContent = 'Find the hidden coin to reveal the next one!';
-    
-    // Shuffle coin locations again
-    shuffledLocations = [...coinLocations];
-    for (let i = shuffledLocations.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [shuffledLocations[i], shuffledLocations[j]] = [shuffledLocations[j], shuffledLocations[i]];
-    }
-    
-    // Start new game
-    setTimeout(() => {
-        createNextCoin();
-    }, 1000);
-}
-
+                
                 this.moveSpeed = 0.1;
                 this.turnSpeed = 2;
-                this.islandRadius = 25; // Match your island size
             },
             
             onThumbstickDown: function(evt) {
@@ -225,104 +602,34 @@ resetGame: function() {
                 const x = evt.detail.x;
                 const y = evt.detail.y;
                 
-                console.log('Thumbstick moved:', x, y, this.isLeft ? 'LEFT' : 'RIGHT');
-                
                 const rigPos = this.rig.getAttribute('position');
                 const camRot = this.camera.getAttribute('rotation');
                 
-                // LEFT CONTROLLER = MOVEMENT
                 if (this.isLeft && (Math.abs(x) > 0.1 || Math.abs(y) > 0.1)) {
                     const moveX = x * this.moveSpeed;
                     const moveZ = -y * this.moveSpeed;
                     
-                    // Move relative to camera direction
-const radY = THREE.MathUtils.degToRad(camRot.y);
-const newX = rigPos.x + (moveX * Math.cos(radY) - moveZ * Math.sin(radY));
-const newZ = rigPos.z + (moveX * Math.sin(radY) + moveZ * Math.cos(radY));
-
-// Check if new position is within island bounds
-const distanceFromCenter = Math.sqrt(newX * newX + newZ * newZ);
-if (distanceFromCenter > this.islandRadius) {
-    // Player fell off the island!
-    this.gameOver();
-    return;
-}
-
-this.rig.setAttribute('position', `${newX} ${rigPos.y} ${newZ}`);
+                    const radY = THREE.MathUtils.degToRad(camRot.y);
+                    const newX = rigPos.x + (moveX * Math.cos(radY) - moveZ * Math.sin(radY));
+                    const newZ = rigPos.z + (moveX * Math.sin(radY) + moveZ * Math.cos(radY));
+                    
+                    const distanceFromCenter = Math.sqrt(newX * newX + newZ * newZ);
+                    if (distanceFromCenter > islandRadius) {
+                        gameOver();
+                        return;
+                    }
+                    
+                    this.rig.setAttribute('position', `${newX} ${rigPos.y} ${newZ}`);
                 }
                 
-                // RIGHT CONTROLLER = TURNING
                 if (this.isRight && Math.abs(x) > 0.1) {
                     const newY = camRot.y + (x * this.turnSpeed);
                     this.camera.setAttribute('rotation', `${camRot.x} ${newY} ${camRot.z}`);
                 }
             }
         });
-// Boundary check for desktop WASD movement
-AFRAME.registerComponent('boundary-check', {
-    init: function() {
-        this.rig = document.querySelector('#cameraRig');
-        this.islandRadius = 25;
-        this.checkInterval = setInterval(this.checkBounds.bind(this), 100);
-    },
-    
-    checkBounds: function() {
-        if (!this.rig) return;
-        
-        const rigPos = this.rig.getAttribute('position');
-        const distanceFromCenter = Math.sqrt(rigPos.x * rigPos.x + rigPos.z * rigPos.z);
-        
-        if (distanceFromCenter > this.islandRadius) {
-            this.gameOver();
-        }
-    },
-    
-    gameOver: function() {
-        clearInterval(this.checkInterval);
-        
-        // Remove current coin
-        const coinContainer = document.getElementById('coin-container');
-        if (coinContainer) {
-            coinContainer.innerHTML = '';
-        }
-        
-        setTimeout(() => {
-            const playAgain = confirm('You fell off the island! Game Over.\n\nWould you like to play again?');
-            if (playAgain) {
-                this.resetGame();
-            }
-        }, 500);
-    },
-    
-    resetGame: function() {
-        // Reset player position
-        this.rig.setAttribute('position', '0 0 3');
-        this.el.setAttribute('rotation', '0 0 0');
-        
-        // Reset score
-        score = 0;
-        currentCoinIndex = 0;
-        document.getElementById('score').textContent = 'Score: 0 / 15';
-        document.getElementById('instructions').textContent = 'Find the hidden coin to reveal the next one!';
-        
-        // Shuffle coin locations again
-        shuffledLocations = [...coinLocations];
-        for (let i = shuffledLocations.length - 1; i > 0; i--) {
-            const j = Math.floor(Math.random() * (i + 1));
-            [shuffledLocations[i], shuffledLocations[j]] = [shuffledLocations[j], shuffledLocations[i]];
-        }
-        
-        // Restart boundary checking
-        this.checkInterval = setInterval(this.checkBounds.bind(this), 100);
-        
-        // Start new game
-        setTimeout(() => {
-            createNextCoin();
-        }, 1000);
-    }
-});
 
-        // Wait for scene to load then add movement
+        // Initialize everything
         document.addEventListener('DOMContentLoaded', function() {
             const scene = document.querySelector('a-scene');
             
@@ -335,40 +642,19 @@ AFRAME.registerComponent('boundary-check', {
                     
                     if (leftController) {
                         leftController.setAttribute('thumbstick-movement', '');
-                        console.log('Added movement to left controller');
                     }
                     
                     if (rightController) {
                         rightController.setAttribute('thumbstick-movement', '');
-                        console.log('Added movement to right controller');
                     }
                     
-                    // Start game
+                    startBoundaryCheck();
+                    shuffleLocations();
                     createNextCoin();
                 }, 1000);
             });
         });
 
-        // Your coin game code
-        let score = 0;
-        const scoreElement = document.getElementById('score');
-        const instructionsElement = document.getElementById('instructions');
-        
-        const coinLocations = [
-            "3 0.2 1", "-7 0.2 -1", "13 0.2 6", "-5 0.2 10", "16 0.2 -8",
-            "-14 0.2 -7", "7 0.2 -4", "-1 0.2 -13", "19 0.2 8", "-17 0.2 -10",
-            "2 0.2 -16", "-12 0.2 14", "22 0.2 -1", "-8 0.2 -20", "6 0.2 21"
-        ];
-        
-        let shuffledLocations = [...coinLocations];
-        for (let i = shuffledLocations.length - 1; i > 0; i--) {
-            const j = Math.floor(Math.random() * (i + 1));
-            [shuffledLocations[i], shuffledLocations[j]] = [shuffledLocations[j], shuffledLocations[i]];
-        }
-        
-        let currentCoinIndex = 0;
-        let currentCoin = null;
-        
         function createNextCoin() {
             if (currentCoinIndex < 15) {
                 const coinContainer = document.getElementById('coin-container');
@@ -395,6 +681,54 @@ AFRAME.registerComponent('boundary-check', {
         }
         
         function handleCoinClick() {
+            // Trigger celebration on all hands
+            const leftController = document.querySelector('#leftController');
+            const rightController = document.querySelector('#rightController');
+            const pcLeftHand = document.querySelector('#pcLeftHand');
+            const pcRightHand = document.querySelector('#pcRightHand');
+            
+            if (leftController && leftController.components['hand-animation']) {
+                leftController.components['hand-animation'].celebrateGesture();
+            }
+            if (rightController && rightController.components['hand-animation']) {
+                rightController.components['hand-animation'].celebrateGesture();
+            }
+            if (pcLeftHand && pcLeftHand.components['pc-hand-animation']) {
+                pcLeftHand.components['pc-hand-animation'].celebrateGesture();
+            }
+            if (pcRightHand && pc
+RightHand.components['pc-hand-animation']) {
+                pcRightHand.components['pc-hand-animation'].celebrateGesture();
+            }
+            
             this.remove();
             score += 1;
-            scoreElement
+            scoreElement.textContent = `Score: ${score} / 15`;
+            currentCoinIndex += 1;
+            
+            if (score < 15) {
+                instructionsElement.textContent = `Great! Find coin ${score + 1} of 15`;
+                setTimeout(() => {
+                    createNextCoin();
+                }, 500);
+            } else {
+                instructionsElement.textContent = 'Amazing! All coins found!';
+                setTimeout(() => {
+                    alert('Congratulations! You found all 15 treasure coins!');
+                    const playAgain = confirm('Would you like to play again?');
+                    if (playAgain) {
+                        resetGame();
+                    }
+                }, 100);
+            }
+        }
+
+        // Disable right-click context menu for PC hand gestures
+        document.addEventListener('contextmenu', function(e) {
+            e.preventDefault();
+        });
+    </script>
+</body>
+</html>
+
+                
