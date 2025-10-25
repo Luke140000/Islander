@@ -1,338 +1,261 @@
 <!DOCTYPE html>
 <html>
-  <head>
+<head>
     <script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
     <style>
-      #score {
-        position: fixed;
-        top: 20px;
-        left: 20px;
-        font-size: 24px;
-        color: white;
-        background: rgba(0, 0, 0, 0.7);
-        padding: 10px;
-        border-radius: 5px;
-        z-index: 100;
-      }
-      #instructions {
-        position: fixed;
-        top: 70px;
-        left: 20px;
-        font-size: 16px;
-        color: white;
-        background: rgba(0, 0, 0, 0.7);
-        padding: 10px;
-        border-radius: 5px;
-        z-index: 100;
-      }
-      #timer {
-        position: fixed;
-        top: 20px;
-        right: 20px;
-        font-size: 32px;
-        color: white;
-        background: rgba(255, 0, 0, 0.8);
-        padding: 15px;
-        border-radius: 10px;
-        z-index: 100;
-        font-weight: bold;
-      }
+        #score {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            font-size: 24px;
+            color: white;
+            background: rgba(0,0,0,0.7);
+            padding: 10px;
+            border-radius: 5px;
+            z-index: 100;
+        }
+        #instructions {
+            position: fixed;
+            top: 70px;
+            left: 20px;
+            font-size: 16px;
+            color: white;
+            background: rgba(0,0,0,0.7);
+            padding: 10px;
+            border-radius: 5px;
+            z-index: 100;
+        }
+        #timer {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            font-size: 32px;
+            color: white;
+            background: rgba(255,0,0,0.8);
+            padding: 15px;
+            border-radius: 10px;
+            z-index: 100;
+            font-weight: bold;
+        }
+        #startButton {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 28px;
+            padding: 15px 40px;
+            background: linear-gradient(45deg, #00c853, #00e676);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            z-index: 200;
+            box-shadow: 0 0 20px rgba(0,0,0,0.5);
+            transition: all 0.3s;
+        }
+        #startButton:hover {
+            background: linear-gradient(45deg, #00e676, #00c853);
+            transform: translate(-50%, -50%) scale(1.05);
+        }
     </style>
-  </head>
-  <body>
+</head>
+<body>
+    <!-- UI Display -->
     <div id="score">Score: 0 / 15</div>
-    <div id="instructions">Find the hidden coin to reveal the next one!</div>
+    <div id="instructions">Click 'Start Game' to begin!</div>
     <div id="timer">Time: 60</div>
+    <button id="startButton">Start Game</button>
 
     <a-scene background="color: skyblue" vr-mode-ui="enabled: true">
-      <a-entity id="cameraRig" position="0 0 3">
-        <a-camera
-          position="0 1.6 0"
-          look-controls="pointerLockEnabled: true"
-          wasd-controls="acceleration: 80; fly: false"
-        >
-          <a-cursor
-            position="0 0 -1"
-            geometry="primitive: ring; radiusInner: 0.02; radiusOuter: 0.03"
-            material="color: white; shader: flat"
-            animation__click="property: scale; startEvents: click; from: 0.1 0.1 0.1; to: 1 1 1; dur: 150"
-            raycaster="objects: .coin"
-            visible="true"
-          ></a-cursor>
-        </a-camera>
+        <a-entity id="cameraRig" position="0 0 3">
+            <a-camera position="0 1.6 0" 
+                     look-controls="pointerLockEnabled: true"
+                     wasd-controls="acceleration: 80; fly: false">
+                <a-cursor position="0 0 -1" 
+                         geometry="primitive: ring; radiusInner: 0.02; radiusOuter: 0.03" 
+                         material="color: white; shader: flat" 
+                         animation__click="property: scale; startEvents: click; from: 0.1 0.1 0.1; to: 1 1 1; dur: 150"
+                         raycaster="objects: .coin"
+                         visible="true"></a-cursor>
+            </a-camera>
+            <a-entity id="leftController" oculus-touch-controls="hand: left" raycaster="objects: .coin"></a-entity>
+            <a-entity id="rightController" oculus-touch-controls="hand: right" raycaster="objects: .coin" laser-controls></a-entity>
+        </a-entity>
 
-        <a-entity
-          id="leftController"
-          oculus-touch-controls="hand: left"
-          raycaster="objects: .coin"
-        ></a-entity>
+        <!-- Lighting -->
+        <a-light type="ambient" color="#404040"></a-light>
+        <a-light type="point" position="0 10 0" color="white"></a-light>
 
-        <a-entity
-          id="rightController"
-          oculus-touch-controls="hand: right"
-          raycaster="objects: .coin"
-          laser-controls
-        ></a-entity>
-      </a-entity>
+        <!-- Island base -->
+        <a-cylinder position="0 -1 0" radius="25" height="2" color="sandybrown"></a-cylinder>
 
-      <a-light type="ambient" color="#404040"></a-light>
-      <a-light type="point" position="0 10 0" color="white"></a-light>
+        <!-- Trees and scenery (unchanged for brevity) -->
+        <a-cylinder position="5 2 -3" radius="0.4" height="8" color="brown"></a-cylinder>
+        <a-sphere position="5 6.5 -3" radius="2" color="green"></a-sphere>
 
-      <!-- Island -->
-      <a-cylinder
-        position="0 -1 0"
-        radius="25"
-        height="2"
-        color="sandybrown"
-      ></a-cylinder>
-
-      <!-- Visible island border -->
-      <a-ring
-        id="island-border"
-        position="0 0.05 0"
-        rotation="-90 0 0"
-        radius-inner="24.8"
-        radius-outer="25"
-        color="red"
-        material="shader: flat; opacity: 0.8"
-        animation="property: material.color; from: red; to: orange; loop: true; dur: 1000; dir: alternate"
-      ></a-ring>
-
-      <!-- Example trees -->
-      <a-cylinder
-        position="5 2 -3"
-        radius="0.4"
-        height="8"
-        color="brown"
-      ></a-cylinder>
-      <a-sphere position="5 6.5 -3" radius="2" color="green"></a-sphere>
-
-      <!-- Container for dynamically created coins -->
-      <a-entity id="coin-container"></a-entity>
+        <!-- Container for dynamically created coins -->
+        <a-entity id="coin-container"></a-entity>
     </a-scene>
 
     <script>
-      let score = 0;
-      let currentCoinIndex = 0;
-      let currentCoin = null;
-      let gameTimer = null;
-      let timeLeft = 60;
-      let gameActive = false;
-      const islandRadius = 25;
+        // Game variables
+        let score = 0;
+        let currentCoinIndex = 0;
+        let gameTimer = null;
+        let timeLeft = 60;
+        let gameActive = false;
 
-      const scoreElement = document.getElementById("score");
-      const instructionsElement = document.getElementById("instructions");
-      const timerElement = document.getElementById("timer");
+        const scoreElement = document.getElementById('score');
+        const instructionsElement = document.getElementById('instructions');
+        const timerElement = document.getElementById('timer');
+        const startButton = document.getElementById('startButton');
 
-      const coinLocations = [
-        "3 0.2 1",
-        "-7 0.2 -1",
-        "13 0.2 6",
-        "-5 0.2 10",
-        "16 0.2 -8",
-        "-14 0.2 -7",
-        "7 0.2 -4",
-        "-1 0.2 -13",
-        "19 0.2 8",
-        "-17 0.2 -10",
-        "2 0.2 -16",
-        "-12 0.2 14",
-        "22 0.2 -1",
-        "-8 0.2 -20",
-        "6 0.2 21",
-      ];
-      let shuffledLocations = [...coinLocations];
+        const coinLocations = [
+            "3 0.2 1", "-7 0.2 -1", "13 0.2 6", "-5 0.2 10", "16 0.2 -8",
+            "-14 0.2 -7", "7 0.2 -4", "-1 0.2 -13", "19 0.2 8", "-17 0.2 -10",
+            "2 0.2 -16", "-12 0.2 14", "22 0.2 -1", "-8 0.2 -20", "6 0.2 21"
+        ];
+        let shuffledLocations = [...coinLocations];
 
-      function shuffleLocations() {
-        shuffledLocations = [...coinLocations];
-        for (let i = shuffledLocations.length - 1; i > 0; i--) {
-          const j = Math.floor(Math.random() * (i + 1));
-          [shuffledLocations[i], shuffledLocations[j]] = [
-            shuffledLocations[j],
-            shuffledLocations[i],
-          ];
-        }
-      }
-
-      function updateTimerDisplay() {
-        timerElement.textContent = `Time: ${timeLeft}`;
-        if (timeLeft <= 10) {
-          timerElement.style.background = "rgba(255,0,0,0.9)";
-        } else if (timeLeft <= 30) {
-          timerElement.style.background = "rgba(255,165,0,0.8)";
-        } else {
-          timerElement.style.background = "rgba(0,128,0,0.8)";
-        }
-      }
-
-      function stopTimer() {
-        if (gameTimer) clearInterval(gameTimer);
-        gameTimer = null;
-        gameActive = false;
-      }
-
-      function timeUp() {
-        stopTimer();
-        alert(`Time's up! You found ${score} out of 15 coins!`);
-        const playAgain = confirm("Play again?");
-        if (playAgain) resetGame();
-      }
-
-      function startTimer() {
-        gameActive = true;
-        timeLeft = 60;
-        updateTimerDisplay();
-        gameTimer = setInterval(() => {
-          timeLeft--;
-          updateTimerDisplay();
-          if (timeLeft <= 0) timeUp();
-        }, 1000);
-      }
-
-      function gameOver() {
-        stopTimer();
-        gameActive = false;
-        alert(`You fell off the island! You found ${score} out of 15 coins.`);
-        const playAgain = confirm("Play again?");
-        if (playAgain) resetGame();
-      }
-
-      function resetGame() {
-        const rig = document.getElementById("cameraRig");
-        rig.setAttribute("position", "0 0 3");
-        score = 0;
-        currentCoinIndex = 0;
-        scoreElement.textContent = "Score: 0 / 15";
-        shuffleLocations();
-        createNextCoin();
-        startTimer();
-      }
-
-      // Real-time boundary detection + warning
-      AFRAME.registerComponent("boundary-check", {
-        tick: function () {
-          if (!gameActive) return;
-          const rig = document.getElementById("cameraRig");
-          if (!rig) return;
-          const pos = rig.object3D.position;
-          const distance = Math.sqrt(pos.x * pos.x + pos.z * pos.z);
-          const border = document.getElementById("island-border");
-
-          // Warning zone (within 2m of edge)
-          if (distance > islandRadius - 2 && distance < islandRadius) {
-            border.setAttribute("color", "yellow");
-            border.setAttribute("material", "opacity: 1");
-            instructionsElement.textContent =
-              "⚠️ Warning: You're near the edge of the island!";
-          } else {
-            border.setAttribute("color", "red");
-            instructionsElement.textContent =
-              "Find the hidden coin to reveal the next one!";
-          }
-
-          // Out of bounds → game over
-          if (distance >= islandRadius) {
-            gameOver();
-          }
-        },
-      });
-
-      // Movement
-      AFRAME.registerComponent("thumbstick-movement", {
-        init: function () {
-          this.rig = document.querySelector("#cameraRig");
-          this.camera = document.querySelector("a-camera");
-          this.isLeft =
-            this.el.getAttribute("oculus-touch-controls").hand === "left";
-          this.isRight =
-            this.el.getAttribute("oculus-touch-controls").hand === "right";
-          this.moveSpeed = 0.3;
-          this.turnSpeed = 3;
-
-          this.el.addEventListener("thumbstickmoved", (evt) => {
-            if (!gameActive) return;
-            const x = evt.detail.x;
-            const y = evt.detail.y;
-            const rigPos = this.rig.getAttribute("position");
-            const camRot = this.camera.getAttribute("rotation");
-
-            if (this.isLeft && (Math.abs(x) > 0.1 || Math.abs(y) > 0.1)) {
-              const moveX = x * this.moveSpeed;
-              const moveZ = -y * this.moveSpeed;
-              const radY = THREE.MathUtils.degToRad(camRot.y);
-              const newX =
-                rigPos.x +
-                (moveX * Math.cos(radY) - moveZ * Math.sin(radY));
-              const newZ =
-                rigPos.z +
-                (moveX * Math.sin(radY) + moveZ * Math.cos(radY));
-              this.rig.setAttribute(
-                "position",
-                `${newX} ${rigPos.y} ${newZ}`
-              );
+        // Shuffle coin locations
+        function shuffleLocations() {
+            shuffledLocations = [...coinLocations];
+            for (let i = shuffledLocations.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [shuffledLocations[i], shuffledLocations[j]] = [shuffledLocations[j], shuffledLocations[i]];
             }
+        }
 
-            if (this.isRight && Math.abs(x) > 0.1) {
-              const newY = camRot.y + x * this.turnSpeed;
-              this.camera.setAttribute(
-                "rotation",
-                `${camRot.x} ${newY} ${camRot.z}`
-              );
+        // Timer functions
+        function startTimer() {
+            timeLeft = 60;
+            updateTimerDisplay();
+            gameTimer = setInterval(() => {
+                timeLeft--;
+                updateTimerDisplay();
+                if (timeLeft <= 0) timeUp();
+            }, 1000);
+        }
+
+        function stopTimer() {
+            if (gameTimer) clearInterval(gameTimer);
+        }
+
+        function updateTimerDisplay() {
+            timerElement.textContent = `Time: ${timeLeft}`;
+            if (timeLeft <= 10) timerElement.style.background = 'rgba(255,0,0,0.9)';
+            else if (timeLeft <= 30) timerElement.style.background = 'rgba(255,165,0,0.8)';
+            else timerElement.style.background = 'rgba(0,128,0,0.8)';
+        }
+
+        // Game flow functions
+        function timeUp() {
+            stopTimer();
+            alert(`Time's up! You found ${score} out of 15 coins!`);
+            resetGame();
+        }
+
+        function resetGame() {
+            const rig = document.querySelector('#cameraRig');
+            rig.setAttribute('position', '0 0 3');
+            score = 0;
+            currentCoinIndex = 0;
+            gameActive = false;
+            stopTimer();
+            document.getElementById('coin-container').innerHTML = '';
+            scoreElement.textContent = 'Score: 0 / 15';
+            instructionsElement.textContent = 'Click "Start Game" to begin!';
+            startButton.style.display = 'block';
+        }
+
+        function startGame() {
+            startButton.style.display = 'none';
+            instructionsElement.textContent = 'Find the hidden coin to reveal the next one!';
+            score = 0;
+            currentCoinIndex = 0;
+            gameActive = true;
+            shuffleLocations();
+            createNextCoin();
+            startTimer();
+        }
+
+        function createNextCoin() {
+            const container = document.getElementById('coin-container');
+            container.innerHTML = '';
+            if (currentCoinIndex < 15) {
+                const coin = document.createElement('a-cylinder');
+                coin.setAttribute('class', 'coin');
+                coin.setAttribute('position', shuffledLocations[currentCoinIndex]);
+                coin.setAttribute('radius', '0.08');
+                coin.setAttribute('height', '0.02');
+                coin.setAttribute('color', '#DAA520');
+                coin.setAttribute('animation', 'property: rotation; to: 0 360 0; loop: true; dur: 3000');
+
+                coin.addEventListener('click', () => {
+                    if (!gameActive) return;
+                    coin.remove();
+                    score++;
+                    currentCoinIndex++;
+                    scoreElement.textContent = `Score: ${score} / 15`;
+                    if (score >= 15) {
+                        stopTimer();
+                        alert(`You found all 15 coins with ${timeLeft} seconds left!`);
+                        resetGame();
+                    } else {
+                        createNextCoin();
+                    }
+                });
+
+                container.appendChild(coin);
             }
-          });
-        },
-      });
+        }
 
-      document.addEventListener("DOMContentLoaded", () => {
-        const scene = document.querySelector("a-scene");
-        scene.addEventListener("loaded", () => {
-          const leftController = document.querySelector("#leftController");
-          const rightController = document.querySelector("#rightController");
-          if (leftController)
-            leftController.setAttribute("thumbstick-movement", "");
-          if (rightController)
-            rightController.setAttribute("thumbstick-movement", "");
-          scene.setAttribute("boundary-check", ""); // attach component
-          shuffleLocations();
-          createNextCoin();
-          startTimer();
+        // Add VR controller movement
+        AFRAME.registerComponent('thumbstick-movement', {
+            init: function() {
+                this.rig = document.querySelector('#cameraRig');
+                this.camera = document.querySelector('a-camera');
+                this.isLeft = this.el.getAttribute('oculus-touch-controls').hand === 'left';
+                this.isRight = this.el.getAttribute('oculus-touch-controls').hand === 'right';
+                this.moveSpeed = 0.3;
+                this.turnSpeed = 3;
+
+                this.el.addEventListener('thumbstickmoved', evt => {
+                    if (!gameActive) return;
+                    const x = evt.detail.x, y = evt.detail.y;
+                    const rigPos = this.rig.getAttribute('position');
+                    const camRot = this.camera.getAttribute('rotation');
+
+                    if (this.isLeft && (Math.abs(x) > 0.1 || Math.abs(y) > 0.1)) {
+                        const moveX = x * this.moveSpeed;
+                        const moveZ = -y * this.moveSpeed;
+                        const radY = THREE.MathUtils.degToRad(camRot.y);
+                        const newX = rigPos.x + (moveX * Math.cos(radY) - moveZ * Math.sin(radY));
+                        const newZ = rigPos.z + (moveX * Math.sin(radY) + moveZ * Math.cos(radY));
+                        this.rig.setAttribute('position', `${newX} ${rigPos.y} ${newZ}`);
+                    }
+
+                    if (this.isRight && Math.abs(x) > 0.1) {
+                        const newY = camRot.y + (x * this.turnSpeed);
+                        this.camera.setAttribute('rotation', `${camRot.x} ${newY} ${camRot.z}`);
+                    }
+                });
+            }
         });
-      });
 
-      function createNextCoin() {
-        const container = document.getElementById("coin-container");
-        container.innerHTML = "";
-        if (currentCoinIndex < 15) {
-          const coin = document.createElement("a-cylinder");
-          coin.setAttribute("class", "coin");
-          coin.setAttribute("position", shuffledLocations[currentCoinIndex]);
-          coin.setAttribute("radius", "0.08");
-          coin.setAttribute("height", "0.02");
-          coin.setAttribute("color", "#DAA520");
-          coin.setAttribute(
-            "animation",
-            "property: rotation; to: 0 360 0; loop: true; dur: 3000"
-          );
-          coin.addEventListener("click", () => {
-            if (!gameActive) return;
-            coin.remove();
-            score++;
-            scoreElement.textContent = `Score: ${score} / 15`;
-            currentCoinIndex++;
-            if (score >= 15) {
-              stopTimer();
-              alert(
-                `You found all 15 coins with ${timeLeft} seconds to spare!`
-              );
-              const playAgain = confirm("Play again?");
-              if (playAgain) resetGame();
-            } else {
-              createNextCoin();
-            }
-          });
-          container.appendChild(coin);
-        }
-      }
+        // Scene setup
+        document.addEventListener('DOMContentLoaded', () => {
+            const scene = document.querySelector('a-scene');
+            scene.addEventListener('loaded', () => {
+                const leftController = document.querySelector('#leftController');
+                const rightController = document.querySelector('#rightController');
+                if (leftController) leftController.setAttribute('thumbstick-movement', '');
+                if (rightController) rightController.setAttribute('thumbstick-movement', '');
+            });
+        });
+
+        // Hook up start button
+        startButton.addEventListener('click', startGame);
     </script>
-  </body>
+</body>
 </html>
